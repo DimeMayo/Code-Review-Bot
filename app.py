@@ -4,6 +4,7 @@ import jwt
 import requests
 from github import Github, Auth
 from dotenv import load_dotenv
+from openai import OpenAI
 
 load_dotenv()
 
@@ -35,33 +36,86 @@ access_token = response.json()["token"]
 installation_auth = Auth.Token(access_token)
 installation_client = Github(auth=installation_auth)
 
-def analyze_and_comment(code_text):
-    """Insert comments directly into Python source code."""
-    lines = code_text.splitlines()
-    new_lines = []
-    for i, line in enumerate(lines):
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    
+def analyze_and_comment(code_text, requirements_text=None):
+    """
+    Analyze the code for both quality and assignment requirement completion.
+    Adds inline "# AI Review:" comments above relevant lines.
+    """
+
+    # Clean up existing comments
+    lines = [l for l in code_text.splitlines() if not l.strip().startswith("# AI Review:")]
+    joined_code = "\n".join(lines)
+
+    if requirements_text:
+        prompt = f"""
+You are an expert teaching assistant reviewing a student's Python code for an assignment.
+Here are the assignment requirements:
+
+{requirements_text}
+
+Review the following code. For each requirement, check if it is met or not.
+If something is missing, implemented incorrectly, or can cause a bug, insert a comment above
+the relevant code line, starting with "# AI Review:" explaining the issue and
+how to fix it. If everything looks fine for a requirement, you don't need to comment.
+Include any missing requirements as comments at the start of the code and analyze their 
+progress as a percentage.
+
+Be specific, concise, and avoid redundant comments.
+Do not add "```python" at the start of the code and "```" at the end of the code.
+
+Code:
+{joined_code}
+"""
+    else:
+        prompt = f"""
+You are an expert Python reviewer.
+Review the following code for possible bugs or improvements. Insert inline comments
+starting with "# AI Review:" ABOVE the relevant lines. Avoid duplicates and noise.
+
+Code:
+{joined_code}
+"""
+
+    # Call OpenAI API
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "system", "content": "You are an expert Python code reviewer."},
+            {"role": "user", "content": prompt},
+        ],
+        temperature=0.3,
+    )
+
+    reviewed_code = response.choices[0].message.content.strip()
+
+    # Remove duplicate comments
+    reviewed_lines = []
+    last_comment = None
+    for line in reviewed_code.splitlines():
         stripped = line.strip()
-
-        # Skip adding if this line is already a comment from the bot
-        if stripped.startswith("# ⚠️") or stripped.startswith("# 📝") or stripped.startswith("# ✅"):
-            new_lines.append(line)
-            continue
-
-        # Add warnings only if not already present in nearby lines
-        if "print(" in stripped:
-            if not any("Avoid using print()" in l for l in new_lines[-2:]):  # Check last few lines
-                new_lines.append("# ⚠️ Avoid using print() in production code.")
-        elif "TODO" in stripped:
-            if not any("Remember to remove TODO" in l for l in new_lines[-2:]):
-                new_lines.append("# 📝 Remember to remove TODO comments before merging.")
-        elif "eval(" in stripped:
-            if not any("Avoid using eval()" in l for l in new_lines[-2:]):
-                new_lines.append("# ⚠️ Avoid using eval() for security reasons.")
+        if stripped.startswith("# AI Review:"):
+            if stripped == last_comment:
+                continue
+            last_comment = stripped
         else:
-            # No match, keep line as-is
-            pass
-        new_lines.append(line)
-    return "\n".join(new_lines)
+            last_comment = None
+        reviewed_lines.append(line)
+
+    return "\n".join(reviewed_lines)
+
+
+def find_requirement_file(repo):
+    """Find the first Python (.py) file in the repo root."""
+    print("🔍 Searching for Requirement text files in the root directory...")
+    contents = repo.get_contents("")
+    for file in contents:
+        if file.name.endswith(".txt"):
+            print(f"✅ Found Requirement file: {file.path}")
+            return file
+    print("❌ No text files found in the repository root.")
+    return None
 
 def find_main_python_file(repo):
     """Find the first Python (.py) file in the repo root."""
@@ -77,13 +131,18 @@ def find_main_python_file(repo):
 def review_and_update_file():
     """Fetch, analyze, comment, and commit the updated file."""
     repo = installation_client.get_repo(REPO_FULL_NAME)
+    reqfile = find_requirement_file(repo)
+    reqtext = reqfile.decoded_content.decode() if reqfile else None
+    if not reqfile:
+        print("⚠️ Could not find a requirement text file to analyze.")
+        return
     file = find_main_python_file(repo)
     if not file:
         print("⚠️ Could not find a Python file to analyze.")
         return
 
     code = file.decoded_content.decode()
-    commented_code = analyze_and_comment(code)
+    commented_code = analyze_and_comment(code, requirements_text=reqtext)
 
     if code == commented_code:
         print("✅ No changes needed — code looks clean!")
