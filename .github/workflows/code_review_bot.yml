@@ -4,9 +4,6 @@ name: 🤖 Code Review Bot
 on:
   workflow_dispatch:
     inputs:
-      installation_id:
-        description: 'GitHub App Installation ID'
-        required: true
       repo_full_name:
         description: 'Repository full name (e.g., user/repo)'
         required: true

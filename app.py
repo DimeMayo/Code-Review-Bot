@@ -17,15 +17,19 @@ else:
 APP_ID = os.getenv("APP_ID")
 PRIVATE_KEY = os.getenv("PRIVATE_KEY")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-INSTALLATION_ID = int(os.getenv("INSTALLATION_ID"))
 REPO_FULL_NAME = os.getenv("REPO_FULL_NAME")
+
 
 
 
 # Authenticate as the app installation
 auth = Auth.AppAuth(app_id=APP_ID, private_key=PRIVATE_KEY)
 github_client = Github(auth=auth)
-jwt_token = auth.create_jwt()  # Short-lived JWT for the App itself
+
+repo_installation = github_client.get_repo(REPO_FULL_NAME).get_installation()
+INSTALLATION_ID = repo_installation.id
+
+jwt_token = auth.create_jwt()  # Short-lived JWT for the App 
 
 url = f"https://api.github.com/app/installations/{INSTALLATION_ID}/access_tokens"
 headers = {
