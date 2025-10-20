@@ -1,6 +1,8 @@
+Desktop App is working
+
 !CURRENTLY NOT WORKING!
 
-For current use of code-review-bot:
+For current use of GitHub App code-review-bot:
 1. Make sure the repository you are testing has a python file
 2. A requirements text file is optional
 3. Install the application into your repository using this link: https://github.com/apps/cs4800codereviewbot/installations/new
