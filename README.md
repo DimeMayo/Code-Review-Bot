@@ -1,6 +1,6 @@
 Desktop App is working
 
-!CURRENTLY NOT WORKING!
+!BELOW IS CURRENTLY NOT WORKING!
 
 For current use of GitHub App code-review-bot:
 1. Make sure the repository you are testing has a python file
