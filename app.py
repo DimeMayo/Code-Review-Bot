@@ -2,6 +2,7 @@ import os
 import time
 import jwt
 import requests
+import json
 from github import Github, Auth
 from dotenv import load_dotenv
 from openai import OpenAI
@@ -13,10 +14,13 @@ if os.getenv("GITHUB_ACTIONS") is None:
 else:
     print("🚀 Running inside GitHub Actions, using repository secrets")
 
+with open(os.getenv("GITHUB_EVENT_PATH")) as f:
+    event = json.load(f)
+
 APP_ID = os.getenv("APP_ID")
-INSTALLATION_ID = int(os.getenv("INSTALLATION_ID"))
+INSTALLATION_ID = event["installation"]["id"]
 PRIVATE_KEY = os.getenv("PRIVATE_KEY")
-REPO_FULL_NAME = os.getenv("REPO_FULL_NAME")
+REPO_FULL_NAME = event["repository"]["full_name"]
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 if INSTALLATION_ID:
