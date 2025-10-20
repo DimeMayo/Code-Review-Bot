@@ -26,18 +26,27 @@ REPO_FULL_NAME = os.getenv("REPO_FULL_NAME")
 auth = Auth.AppAuth(app_id=APP_ID, private_key=PRIVATE_KEY)
 github_client = Github(auth=auth)
 
-repo_installation = github_client.get_repo(REPO_FULL_NAME).get_installation()
-INSTALLATION_ID = repo_installation.id
+
 
 jwt_token = auth.create_jwt()  # Short-lived JWT for the App 
 
-url = f"https://api.github.com/app/installations/{INSTALLATION_ID}/access_tokens"
+owner, repo_name = REPO_FULL_NAME.split("/")
+
+# Use the REST API to get the installation for this repo
+url = f"https://api.github.com/repos/{owner}/{repo_name}/installation"
 headers = {
     "Authorization": f"Bearer {jwt_token}",
     "Accept": "application/vnd.github+json",
 }
 
-response = requests.post(url, headers=headers)
+response = requests.get(url, headers=headers)
+response.raise_for_status()
+INSTALLATION_ID = response.json()["id"]
+
+url_token = f"https://api.github.com/app/installations/{INSTALLATION_ID}/access_tokens"
+
+
+response = requests.post(url_token, headers=headers)
 response.raise_for_status()
 
 access_token = response.json()["token"]
