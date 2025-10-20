@@ -63,9 +63,9 @@ Here are the assignment requirements:
 Review the following code. For each requirement, check if it is met or not.
 If something is missing, implemented incorrectly, or can cause a bug, insert only a comment above
 the relevant code line, starting with "# AI Review:" explaining the issue and
-how to fix it. Do not fix the code or add any code. If everything looks fine for a 
-requirement, you don't need to comment. Include any missing requirements as comments 
-at the start of the code and analyze their progress as a percentage.
+how to fix it. If everything looks fine for a requirement, you don't need to comment. 
+Do not fix the code, add any code, or erase any code.
+Include any missing requirements as comments at the start of the code and analyze their progress as a percentage.
 
 Be specific, concise, and avoid redundant comments.
 Do not add "```python" at the start of the code and "```" at the end of the code.
