@@ -78,7 +78,7 @@ If something is missing, implemented incorrectly, or can cause a bug, insert onl
 the relevant code line, starting with "# AI Review:" explaining the issue and
 how to fix it. If everything looks fine for a requirement, you don't need to comment. 
 Do not fix the code, add any code, or erase any code.
-Include any missing requirements as comments at the start of the code and analyze their progress as a percentage.
+Include any missing requirements as comments at the top of the code and analyze their progress as a percentage.
 
 Be specific, concise, and avoid redundant comments.
 Do not add "```python" at the start of the code and "```" at the end of the code.
