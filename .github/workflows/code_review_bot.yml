@@ -2,8 +2,6 @@ name: 🤖 Code Review Bot
 
 # Run only when manually triggered from the Actions tab
 on:
-  push:
-    branches: [ main ]
   workflow_dispatch:
 
 jobs:
@@ -29,6 +27,5 @@ jobs:
           APP_ID: ${{ secrets.APP_ID }}
           PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          GITHUB_EVENT_PATH: ${{ github.event_path }}
         run: |
           python app.py

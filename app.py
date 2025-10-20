@@ -14,25 +14,13 @@ if os.getenv("GITHUB_ACTIONS") is None:
 else:
     print("🚀 Running inside GitHub Actions, using repository secrets")
 
-with open(os.getenv("GITHUB_EVENT_PATH")) as f:
-    event = json.load(f)
-
 APP_ID = os.getenv("APP_ID")
 PRIVATE_KEY = os.getenv("PRIVATE_KEY")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-INSTALLATION_ID = None
-REPO_FULL_NAME = None
+INSTALLATION_ID = input("Enter the installation ID: ")
+REPO_FULL_NAME = input("Enter the Full Name of the Repository:")
 
-if "installation" in event:
-    INSTALLATION_ID = event["installation"]["id"]
-    REPO_FULL_NAME = event["repository"]["full_name"]
-else:
-    # Manual fallback for testing
-    INSTALLATION_ID = os.getenv("INSTALLATION_ID")
-    REPO_FULL_NAME = os.getenv("REPO_FULL_NAME")
 
-if not INSTALLATION_ID:
-    raise ValueError("❌ INSTALLATION_ID not found — make sure to run from a repo where the app is installed or set it manually.")
 
 # Authenticate as the app installation
 auth = Auth.AppAuth(app_id=APP_ID, private_key=PRIVATE_KEY)
@@ -73,11 +61,11 @@ Here are the assignment requirements:
 {requirements_text}
 
 Review the following code. For each requirement, check if it is met or not.
-If something is missing, implemented incorrectly, or can cause a bug, insert a comment above
+If something is missing, implemented incorrectly, or can cause a bug, insert only a comment above
 the relevant code line, starting with "# AI Review:" explaining the issue and
-how to fix it. If everything looks fine for a requirement, you don't need to comment.
-Include any missing requirements as comments at the start of the code and analyze their 
-progress as a percentage.
+how to fix it. Do not fix the code or add any code. If everything looks fine for a 
+requirement, you don't need to comment. Include any missing requirements as comments 
+at the start of the code and analyze their progress as a percentage.
 
 Be specific, concise, and avoid redundant comments.
 Do not add "```python" at the start of the code and "```" at the end of the code.
