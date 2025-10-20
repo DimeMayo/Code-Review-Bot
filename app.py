@@ -6,16 +6,23 @@ from github import Github, Auth
 from dotenv import load_dotenv
 from openai import OpenAI
 
-load_dotenv()
+if os.getenv("GITHUB_ACTIONS") is None:
+    # Running locally
+    load_dotenv()
+    print("🧩 Loaded local .env file")
+else:
+    print("🚀 Running inside GitHub Actions, using repository secrets")
 
 APP_ID = os.getenv("APP_ID")
 INSTALLATION_ID = int(os.getenv("INSTALLATION_ID"))
-PRIVATE_KEY_PATH = os.getenv("PRIVATE_KEY_PATH")
+PRIVATE_KEY = os.getenv("PRIVATE_KEY")
 REPO_FULL_NAME = os.getenv("REPO_FULL_NAME")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
-# Load private key
-with open(PRIVATE_KEY_PATH, "r") as f:
-    PRIVATE_KEY = f.read()
+if INSTALLATION_ID:
+    INSTALLATION_ID = int(INSTALLATION_ID)
+else:
+    raise ValueError("❌ INSTALLATION_ID environment variable not found!")
 
 # Authenticate as the app installation
 auth = Auth.AppAuth(app_id=APP_ID, private_key=PRIVATE_KEY)
@@ -36,7 +43,7 @@ access_token = response.json()["token"]
 installation_auth = Auth.Token(access_token)
 installation_client = Github(auth=installation_auth)
 
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+client = OpenAI(api_key=OPENAI_API_KEY)
     
 def analyze_and_comment(code_text, requirements_text=None):
     """

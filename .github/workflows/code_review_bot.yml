@@ -1,0 +1,33 @@
+name: 🤖 Code Review Bot
+
+# Run only when manually triggered from the Actions tab
+on:
+  workflow_dispatch:
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install openai PyGithub python-dotenv requests PyJWT
+
+      - name: Run Code Review Bot
+        env:
+          APP_ID: ${{ secrets.APP_ID }}
+          INSTALLATION_ID: ${{ secrets.INSTALLATION_ID }}
+          PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          REPO_FULL_NAME: ${{ secrets.REPO_FULL_NAME }}
+        run: |
+          python app.py
