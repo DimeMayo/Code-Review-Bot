@@ -2,6 +2,8 @@ name: 🤖 Code Review Bot
 
 # Run only when manually triggered from the Actions tab
 on:
+  push:
+    branches: [ main ]
   workflow_dispatch:
 
 jobs:

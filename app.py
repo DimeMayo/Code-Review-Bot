@@ -18,15 +18,21 @@ with open(os.getenv("GITHUB_EVENT_PATH")) as f:
     event = json.load(f)
 
 APP_ID = os.getenv("APP_ID")
-INSTALLATION_ID = event["installation"]["id"]
 PRIVATE_KEY = os.getenv("PRIVATE_KEY")
-REPO_FULL_NAME = event["repository"]["full_name"]
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+INSTALLATION_ID = None
+REPO_FULL_NAME = None
 
-if INSTALLATION_ID:
-    INSTALLATION_ID = int(INSTALLATION_ID)
+if "installation" in event:
+    INSTALLATION_ID = event["installation"]["id"]
+    REPO_FULL_NAME = event["repository"]["full_name"]
 else:
-    raise ValueError("❌ INSTALLATION_ID environment variable not found!")
+    # Manual fallback for testing
+    INSTALLATION_ID = os.getenv("INSTALLATION_ID")
+    REPO_FULL_NAME = os.getenv("REPO_FULL_NAME")
+
+if not INSTALLATION_ID:
+    raise ValueError("❌ INSTALLATION_ID not found — make sure to run from a repo where the app is installed or set it manually.")
 
 # Authenticate as the app installation
 auth = Auth.AppAuth(app_id=APP_ID, private_key=PRIVATE_KEY)
