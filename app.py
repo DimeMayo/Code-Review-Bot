@@ -17,8 +17,8 @@ else:
 APP_ID = os.getenv("APP_ID")
 PRIVATE_KEY = os.getenv("PRIVATE_KEY")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-INSTALLATION_ID = input("Enter the installation ID: ")
-REPO_FULL_NAME = input("Enter the Full Name of the Repository:")
+INSTALLATION_ID = int(os.getenv("INSTALLATION_ID"))
+REPO_FULL_NAME = os.getenv("REPO_FULL_NAME")
 
 
 

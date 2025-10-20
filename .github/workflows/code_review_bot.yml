@@ -3,6 +3,13 @@ name: 🤖 Code Review Bot
 # Run only when manually triggered from the Actions tab
 on:
   workflow_dispatch:
+    inputs:
+      installation_id:
+        description: 'GitHub App Installation ID'
+        required: true
+      repo_full_name:
+        description: 'Repository full name (e.g., user/repo)'
+        required: true
 
 jobs:
   review:
@@ -24,6 +31,8 @@ jobs:
 
       - name: Run Code Review Bot
         env:
+          INSTALLATION_ID: ${{ github.event.inputs.installation_id }}
+          REPO_FULL_NAME: ${{ github.event.inputs.repo_full_name }}
           APP_ID: ${{ secrets.APP_ID }}
           PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
