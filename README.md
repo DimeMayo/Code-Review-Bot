@@ -1,12 +1,16 @@
-Desktop App is working
+WARNING: app.py does not current work!
+Use the desktop app.
 
-!BELOW IS CURRENTLY NOT WORKING!
+How to use desktop applcation (for instructors):
 
-For current use of GitHub App code-review-bot:
-1. Make sure the repository you are testing has a python file
-2. A requirements text file is optional
-3. Install the application into your repository using this link: https://github.com/apps/cs4800codereviewbot/installations/new
-5. Go to Code-Review-Bot --> Actions --> Code Review Bot
-6. Press Run workflow
-8. Input Repository name into Repository full name (e.g., user/repo)
-9. Press the green Run workflow button
+1. Create GitHub Application with the specific permissions:
+  a. Checks: Read and Write
+  b. Contents: Read and Write
+  c. Issues: Read and Write
+  d. Pull requests: Read and Write
+2. Generate a private key
+3. Install the app to your organization
+4. When using the app:
+  a. Click the instructor button
+  b. Add the requirements text file describing the assignment's requirements
+  c. Input the name of the organization
