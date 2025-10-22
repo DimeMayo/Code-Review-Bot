@@ -5,9 +5,19 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, scrolledtext
 import re
 import keyword
+from github import Github, Auth
+import jwt, time, requests
+
 
 
 load_dotenv()
+
+APP_ID = os.getenv("APP_ID")
+PRIVATE_KEY = os.getenv("PRIVATE_KEY")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+
+auth = Auth.AppAuth(app_id=APP_ID, private_key=PRIVATE_KEY)
+github_client = Github(auth=auth)
 
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
@@ -18,7 +28,7 @@ def analyze_and_comment(code_text, requirements_text=None):
     Adds inline "# AI Review:" comments above relevant lines.
     """
 
-    # Clean up existing comments
+    
     lines = [l for l in code_text.splitlines() if not l.strip().startswith("# AI Review:")]
     joined_code = "\n".join(lines)
 
@@ -52,7 +62,6 @@ Code:
 {joined_code}
 """
 
-    # Call OpenAI API
     response = client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[
@@ -64,7 +73,6 @@ Code:
 
     reviewed_code = response.choices[0].message.content.strip()
 
-    # Remove duplicate comments
     reviewed_lines = []
     last_comment = None
     for line in reviewed_code.splitlines():
@@ -158,47 +166,276 @@ def save_output():
         messagebox.showinfo("Saved", f"Reviewed code saved to {file_path}")
 
 
+def start_student_app():
+    menu_window.destroy()
+    open_student_app()
 
-root = tk.Tk()
-root.title("🤖 Code Review Bot")
-root.geometry("900x650")
-root.configure(bg="#1E1E1E")
+def open_student_app():
+    global root, code_entry, req_entry, result_text
+
+    root = tk.Tk()
+    root.title("🤖 Code Review Bot")
+    root.geometry("900x650")
+    root.configure(bg="#1E1E1E")
 
 
-LABEL_COLOR = "#FFFFFF"
-ENTRY_BG = "#2D2D2D"
-ENTRY_FG = "#FFFFFF"
-BUTTON_BG = "#007ACC"
-BUTTON_FG = "#FFFFFF"
-TEXT_BG = "#252526"
-TEXT_FG = "#D4D4D4"
+    LABEL_COLOR = "#FFFFFF"
+    ENTRY_BG = "#2D2D2D"
+    ENTRY_FG = "#FFFFFF"
+    BUTTON_BG = "#007ACC"
+    BUTTON_FG = "#FFFFFF"
+    TEXT_BG = "#252526"
+    TEXT_FG = "#D4D4D4"
 
-def make_label(text):
-    return tk.Label(root, text=text, bg="#1E1E1E", fg=LABEL_COLOR, font=("Segoe UI", 10, "bold"))
+    def make_label(text):
+        return tk.Label(root, text=text, bg="#1E1E1E", fg=LABEL_COLOR, font=("Segoe UI", 10, "bold"))
 
-def make_button(text, command, color=BUTTON_BG):
-    return tk.Button(root, text=text, command=command, bg=color, fg=BUTTON_FG, activebackground="#0E639C", activeforeground="#FFFFFF", relief="flat", padx=8, pady=4)
+    def make_button(text, command, color=BUTTON_BG):
+        return tk.Button(root, text=text, command=command, bg=color, fg=BUTTON_FG, activebackground="#0E639C", activeforeground="#FFFFFF", relief="flat", padx=8, pady=4)
 
-make_label("Python Code File:").pack(anchor="w", padx=10, pady=(10, 0))
-code_entry = tk.Entry(root, width=80, bg=ENTRY_BG, fg=ENTRY_FG, insertbackground="white", relief="flat")
-code_entry.pack(padx=10, pady=2)
-make_button("Browse", select_code_file).pack(pady=5)
+    make_label("Python Code File:").pack(anchor="w", padx=10, pady=(10, 0))
+    code_entry = tk.Entry(root, width=80, bg=ENTRY_BG, fg=ENTRY_FG, insertbackground="white", relief="flat")
+    code_entry.pack(padx=10, pady=2)
+    make_button("Browse", select_code_file).pack(pady=5)
 
-make_label("Requirements Text File (optional):").pack(anchor="w", padx=10, pady=(10, 0))
-req_entry = tk.Entry(root, width=80, bg=ENTRY_BG, fg=ENTRY_FG, insertbackground="white", relief="flat")
-req_entry.pack(padx=10, pady=2)
-make_button("Browse", select_requirements_file).pack(pady=5)
+    make_label("Requirements Text File (optional):").pack(anchor="w", padx=10, pady=(10, 0))
+    req_entry = tk.Entry(root, width=80, bg=ENTRY_BG, fg=ENTRY_FG, insertbackground="white", relief="flat")
+    req_entry.pack(padx=10, pady=2)
+    make_button("Browse", select_requirements_file).pack(pady=5)
 
-make_button("Run Code Review", run_review, color="#4CAF50").pack(pady=10)
-make_button("Save Reviewed Code", save_output, color="#2196F3").pack(pady=5)
+    make_button("Run Code Review", run_review, color="#4CAF50").pack(pady=10)
+    make_button("Save Reviewed Code", save_output, color="#2196F3").pack(pady=5)
 
-make_label("Output:").pack(anchor="w", padx=10, pady=(10, 0))
-result_text = scrolledtext.ScrolledText(
-    root, wrap=tk.WORD, width=95, height=22,
-    bg=TEXT_BG, fg=TEXT_FG, insertbackground="white", relief="flat"
-)
-result_text.pack(padx=10, pady=10, expand=True, fill="both")
+    make_label("Output:").pack(anchor="w", padx=10, pady=(10, 0))
+    result_text = scrolledtext.ScrolledText(
+        root, wrap=tk.WORD, width=95, height=22,
+        bg=TEXT_BG, fg=TEXT_FG, insertbackground="white", relief="flat"
+    )
+    result_text.pack(padx=10, pady=10, expand=True, fill="both")
 
-root.mainloop()
+def start_instructor_app():
+    menu_window.destroy()
+    open_instructor_app()
+
+
+def open_instructor_app():
+    global instructor_root, code_entry, req_entry, result_text
+
+    instructor_root = tk.Tk()
+    instructor_root.title("👩‍🏫 Instructor Code Review")
+    instructor_root.geometry("900x800")
+    instructor_root.configure(bg="#1E1E1E")
+
+    LABEL_COLOR = "#FFFFFF"
+    ENTRY_BG = "#2D2D2D"
+    ENTRY_FG = "#FFFFFF"
+    BUTTON_BG = "#007ACC"
+    BUTTON_FG = "#FFFFFF"
+    TEXT_BG = "#252526"
+    TEXT_FG = "#D4D4D4"
+
+    def make_label(text):
+        return tk.Label(instructor_root, text=text, bg="#1E1E1E", fg=LABEL_COLOR, font=("Segoe UI", 10, "bold"))
+
+    def make_button(text, command, color=BUTTON_BG):
+        return tk.Button(instructor_root, text=text, command=command, bg=color, fg=BUTTON_FG, activebackground="#0E639C", activeforeground="#FFFFFF", relief="flat", padx=8, pady=4)
+
+    top_frame = tk.Frame(instructor_root, bg="#1E1E1E")
+    top_frame.pack(fill="x", padx=10, pady=10)
+
+    make_label("Requirements Text File (optional):").pack(anchor="w", padx=10, pady=(10, 0))
+    req_entry = tk.Entry(instructor_root, width=70, bg=ENTRY_BG, fg=ENTRY_FG, insertbackground="white", relief="flat")
+    req_entry.pack(padx=10, pady=2)
+    make_button("Browse", select_requirements_file).pack(pady=5)
+
+    make_label("Organization Name:").pack(anchor="w", padx=10, pady=(10, 0))
+    org_entry = tk.Entry(instructor_root, width=50, bg=ENTRY_BG, fg=ENTRY_FG, insertbackground="white", relief="flat")
+    org_entry.pack(padx=10, pady=5)
+
+    repo_listbox = tk.Listbox(instructor_root, selectmode=tk.MULTIPLE, width=80, height=15, bg=TEXT_BG, fg=TEXT_FG)
+    repo_listbox.pack(padx=10, pady=10, fill="both", expand=True)
+
+    log_frame = tk.Frame(instructor_root, bg="#1E1E1E")
+    log_frame.pack(fill="both", expand=True, padx=10, pady=(0, 10))
+
+    log_box = scrolledtext.ScrolledText(
+        instructor_root, wrap=tk.WORD, width=95, height=25,
+        bg=TEXT_BG, fg=TEXT_FG, insertbackground="white", relief="flat"
+    )
+    log_box.pack(padx=10, pady=10, expand=True, fill="both")
+
+    def log(message):
+        log_box.config(state=tk.NORMAL)
+        log_box.insert(tk.END, f"{message}\n")
+        log_box.see(tk.END)
+        log_box.config(state=tk.DISABLED)
+        instructor_root.update()
+
+    bottom_frame = tk.Frame(instructor_root, bg="#1E1E1E")
+    bottom_frame.pack(fill="x", pady=(0, 15))
+
+    def run_instructor_review():
+        org_name = org_entry.get().strip()
+        if not org_name:
+            messagebox.showerror("Error", "Please enter an organization name.")
+            return
+
+        requirements_text = None
+        req_path = req_entry.get().strip()
+        if req_path and os.path.exists(req_path):
+            with open(req_path, "r", encoding="utf-8") as f:
+                requirements_text = f.read()
+
+        try:
+            log(f"🔑 Authenticating as GitHub App (App ID: {APP_ID})...")
+
+            # Create JWT for GitHub App authentication
+            payload = {
+                "iat": int(time.time()) - 60,
+                "exp": int(time.time()) + (10 * 60),
+                "iss": APP_ID
+            }
+            app_jwt = jwt.encode(payload, PRIVATE_KEY, algorithm="RS256")
+
+            headers = {"Authorization": f"Bearer {app_jwt}", "Accept": "application/vnd.github+json"}
+            log("🔍 Fetching app installations...")
+
+            # Fetch installations for this GitHub App
+            response = requests.get("https://api.github.com/app/installations", headers=headers)
+            response.raise_for_status()
+            installations = response.json()
+
+            installation_id = None
+            for inst in installations:
+                if inst["account"]["login"].lower() == org_name.lower():
+                    installation_id = inst["id"]
+                    break
+
+            if not installation_id:
+                messagebox.showerror("Error", f"The app is not installed on the organization '{org_name}'.")
+                return
+
+            log(f"✅ Found installation for '{org_name}' (ID: {installation_id})")
+
+            # Create installation access token
+            token_url = f"https://api.github.com/app/installations/{installation_id}/access_tokens"
+            token_response = requests.post(token_url, headers=headers)
+            token_response.raise_for_status()
+            access_token = token_response.json()["token"]
+
+            # Use token to authenticate with PyGithub
+            installation_client = Github(auth=Auth.Token(access_token))
+            org = installation_client.get_organization(org_name)
+            repos = org.get_repos()
+
+            log(f"✅ Connected to organization '{org_name}' — found {repos.totalCount} repositories.")
+            log("🔍 Starting AI code review across all repositories...\n")
+
+            for repo in repos:
+                log(f"\n📦 Reviewing repository: {repo.name}")
+                try:
+                    process_repository(repo, requirements_text, log)
+                except Exception as e:
+                    log(f"⚠️ Error in {repo.name}: {e}")
+
+            log("\n✅ Code review completed for all repositories.")
+
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to process organization: {e}")
+
+    def process_repository(repo, requirements_text, log):
+        # Create a safe branch for reviewed code
+        base_branch = repo.default_branch
+        branch_name = "ai-code-review"
+
+        try:
+            base_ref = repo.get_git_ref(f"heads/{base_branch}")
+            repo.create_git_ref(ref=f"refs/heads/{branch_name}", sha=base_ref.object.sha)
+            log(f"🌿 Created branch '{branch_name}' from '{base_branch}'")
+        except Exception:
+            log(f"ℹ️ Branch '{branch_name}' already exists. Continuing...")
+
+        def walk_directory(path=""):
+            contents = repo.get_contents(path)
+            for content_file in contents:
+                if content_file.type == "dir":
+                    walk_directory(content_file.path)
+                elif content_file.name.endswith(".py"):
+                    log(f"🧠 Analyzing {content_file.path}")
+                    code = content_file.decoded_content.decode("utf-8")
+                    reviewed_code = analyze_and_comment(code, requirements_text)
+
+                    if reviewed_code.strip() != code.strip():
+                        repo.update_file(
+                            path=content_file.path,
+                            message=f"🤖 AI Code Review: Updated {content_file.name}",
+                            content=reviewed_code,
+                            sha=content_file.sha,
+                            branch=branch_name
+                        )
+                        log(f"✅ Updated {content_file.path}")
+                    else:
+                        log(f"🟢 No changes needed for {content_file.path}")
+
+        walk_directory()
+
+    make_button("Run Organization Review", run_instructor_review, color="#4CAF50").pack(pady=10)
+
+
+menu_window = tk.Tk()
+menu_window.title("Code Review Bot 🤖")
+menu_window.geometry("900x650")
+menu_window.configure(bg="#1E1E1E")
+
+tk.Label(
+    menu_window,
+    text="Code Review Bot!",
+    font=("Arial", 20, "bold"),
+    fg="#00FFAA",
+    bg="#1E1E1E"
+).pack(pady=60)
+
+tk.Label(
+    menu_window,
+    text="Are you a student or instructor?",
+    font=("Arial", 12),
+    fg="white",
+    bg="#1E1E1E"
+).pack(pady=10)
+
+tk.Button(
+    menu_window,
+    text="Student",
+    font=("Arial", 14),
+    bg="#4CAF50",
+    fg="white",
+    padx=20,
+    pady=10,
+    command=start_student_app
+).pack(pady=20)
+
+tk.Button(
+    menu_window,
+    text="Instructor",
+    font=("Arial", 14),
+    bg="#4CAF50",
+    fg="white",
+    padx=20,
+    pady=10,
+    command=start_instructor_app
+).pack(pady=20)
+
+tk.Button(
+    menu_window,
+    text="Exit",
+    font=("Arial", 12),
+    bg="#E53935",
+    fg="white",
+    padx=15,
+    pady=8,
+    command=menu_window.destroy
+).pack(pady=10)
+
+menu_window.mainloop()
 
 
