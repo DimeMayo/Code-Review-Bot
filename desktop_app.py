@@ -13,8 +13,10 @@ import jwt, time, requests
 load_dotenv()
 
 APP_ID = os.getenv("APP_ID")
-PRIVATE_KEY = os.getenv("PRIVATE_KEY")
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+PRIVATE_KEY_PATH = os.getenv("PRIVATE_KEY_PATH")
+
+with open(PRIVATE_KEY_PATH, "r") as f:
+    PRIVATE_KEY = f.read()
 
 auth = Auth.AppAuth(app_id=APP_ID, private_key=PRIVATE_KEY)
 github_client = Github(auth=auth)
@@ -240,9 +242,6 @@ def open_instructor_app():
     def make_button(text, command, color=BUTTON_BG):
         return tk.Button(instructor_root, text=text, command=command, bg=color, fg=BUTTON_FG, activebackground="#0E639C", activeforeground="#FFFFFF", relief="flat", padx=8, pady=4)
 
-    top_frame = tk.Frame(instructor_root, bg="#1E1E1E")
-    top_frame.pack(fill="x", padx=10, pady=10)
-
     make_label("Requirements Text File (optional):").pack(anchor="w", padx=10, pady=(10, 0))
     req_entry = tk.Entry(instructor_root, width=70, bg=ENTRY_BG, fg=ENTRY_FG, insertbackground="white", relief="flat")
     req_entry.pack(padx=10, pady=2)
@@ -255,11 +254,8 @@ def open_instructor_app():
     repo_listbox = tk.Listbox(instructor_root, selectmode=tk.MULTIPLE, width=80, height=15, bg=TEXT_BG, fg=TEXT_FG)
     repo_listbox.pack(padx=10, pady=10, fill="both", expand=True)
 
-    log_frame = tk.Frame(instructor_root, bg="#1E1E1E")
-    log_frame.pack(fill="both", expand=True, padx=10, pady=(0, 10))
-
     log_box = scrolledtext.ScrolledText(
-        instructor_root, wrap=tk.WORD, width=95, height=25,
+        instructor_root, wrap=tk.WORD, width=95, height=15,
         bg=TEXT_BG, fg=TEXT_FG, insertbackground="white", relief="flat"
     )
     log_box.pack(padx=10, pady=10, expand=True, fill="both")
@@ -270,9 +266,6 @@ def open_instructor_app():
         log_box.see(tk.END)
         log_box.config(state=tk.DISABLED)
         instructor_root.update()
-
-    bottom_frame = tk.Frame(instructor_root, bg="#1E1E1E")
-    bottom_frame.pack(fill="x", pady=(0, 15))
 
     def run_instructor_review():
         org_name = org_entry.get().strip()
@@ -287,7 +280,7 @@ def open_instructor_app():
                 requirements_text = f.read()
 
         try:
-            log(f"🔑 Authenticating as GitHub App (App ID: {APP_ID})...")
+            log(f"Authenticating as GitHub App (App ID: {APP_ID})...")
 
             # Create JWT for GitHub App authentication
             payload = {
@@ -298,7 +291,7 @@ def open_instructor_app():
             app_jwt = jwt.encode(payload, PRIVATE_KEY, algorithm="RS256")
 
             headers = {"Authorization": f"Bearer {app_jwt}", "Accept": "application/vnd.github+json"}
-            log("🔍 Fetching app installations...")
+            log("Fetching app installations...")
 
             # Fetch installations for this GitHub App
             response = requests.get("https://api.github.com/app/installations", headers=headers)
@@ -315,7 +308,7 @@ def open_instructor_app():
                 messagebox.showerror("Error", f"The app is not installed on the organization '{org_name}'.")
                 return
 
-            log(f"✅ Found installation for '{org_name}' (ID: {installation_id})")
+            log(f"Found installation for '{org_name}' (ID: {installation_id})")
 
             # Create installation access token
             token_url = f"https://api.github.com/app/installations/{installation_id}/access_tokens"
@@ -328,17 +321,17 @@ def open_instructor_app():
             org = installation_client.get_organization(org_name)
             repos = org.get_repos()
 
-            log(f"✅ Connected to organization '{org_name}' — found {repos.totalCount} repositories.")
-            log("🔍 Starting AI code review across all repositories...\n")
+            log(f"Connected to organization '{org_name}' — found {repos.totalCount} repositories.")
+            log("Starting AI code review across all repositories...\n")
 
             for repo in repos:
-                log(f"\n📦 Reviewing repository: {repo.name}")
+                log(f"\nReviewing repository: {repo.name}")
                 try:
                     process_repository(repo, requirements_text, log)
                 except Exception as e:
-                    log(f"⚠️ Error in {repo.name}: {e}")
+                    log(f"Error in {repo.name}: {e}")
 
-            log("\n✅ Code review completed for all repositories.")
+            log("\nCode review completed for all repositories.")
 
         except Exception as e:
             messagebox.showerror("Error", f"Failed to process organization: {e}")
@@ -351,9 +344,9 @@ def open_instructor_app():
         try:
             base_ref = repo.get_git_ref(f"heads/{base_branch}")
             repo.create_git_ref(ref=f"refs/heads/{branch_name}", sha=base_ref.object.sha)
-            log(f"🌿 Created branch '{branch_name}' from '{base_branch}'")
+            log(f"Created branch '{branch_name}' from '{base_branch}'")
         except Exception:
-            log(f"ℹ️ Branch '{branch_name}' already exists. Continuing...")
+            log(f"ℹBranch '{branch_name}' already exists. Continuing...")
 
         def walk_directory(path=""):
             contents = repo.get_contents(path)
@@ -361,21 +354,30 @@ def open_instructor_app():
                 if content_file.type == "dir":
                     walk_directory(content_file.path)
                 elif content_file.name.endswith(".py"):
-                    log(f"🧠 Analyzing {content_file.path}")
+                    log(f"Analyzing {content_file.path}")
                     code = content_file.decoded_content.decode("utf-8")
                     reviewed_code = analyze_and_comment(code, requirements_text)
 
                     if reviewed_code.strip() != code.strip():
-                        repo.update_file(
-                            path=content_file.path,
-                            message=f"🤖 AI Code Review: Updated {content_file.name}",
-                            content=reviewed_code,
-                            sha=content_file.sha,
-                            branch=branch_name
-                        )
-                        log(f"✅ Updated {content_file.path}")
+                        try:
+                            latest_file = repo.get_contents(content_file.path, ref=branch_name)
+                            current_sha = latest_file.sha
+
+                            repo.update_file(
+                                path=content_file.path,
+                                message=f"🤖 AI Code Review: Updated {content_file.name}",
+                                content=reviewed_code,
+                                sha=current_sha,
+                                branch=branch_name
+                            )
+                            log(f"Updated {content_file.path}")
+                        except Exception as e:
+                            if "409" in str(e):
+                                log(f"Skipped {content_file.path}: conflict (file changed upstream)")
+                            else:
+                                log(f"Error updating {content_file.path}: {e}")
                     else:
-                        log(f"🟢 No changes needed for {content_file.path}")
+                        log(f"No changes needed for {content_file.path}")
 
         walk_directory()
 
