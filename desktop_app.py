@@ -7,6 +7,7 @@ import re
 import keyword
 from github import Github, Auth
 import jwt, time, requests
+from database import register_user, verify_user
 
 
 
@@ -384,60 +385,185 @@ def open_instructor_app():
     make_button("Run Organization Review", run_instructor_review, color="#4CAF50").pack(pady=10)
 
 
-menu_window = tk.Tk()
-menu_window.title("Code Review Bot 🤖")
-menu_window.geometry("900x650")
-menu_window.configure(bg="#1E1E1E")
+# --- AUTH UI: open_auth_window(role) and menu wiring ----------------
 
-tk.Label(
-    menu_window,
-    text="Code Review Bot!",
-    font=("Arial", 20, "bold"),
-    fg="#00FFAA",
-    bg="#1E1E1E"
-).pack(pady=60)
+def open_auth_window(role):
+    """
+    role: 'student' or 'instructor'
+    This opens a window where the user can login OR register.
+    On successful login/register it will open the appropriate app window.
+    """
+    # Close the menu window (we only have one menu_window in global scope)
+    try:
+        menu_window.destroy()
+    except Exception:
+        pass
 
-tk.Label(
-    menu_window,
-    text="Are you a student or instructor?",
-    font=("Arial", 12),
-    fg="white",
-    bg="#1E1E1E"
-).pack(pady=10)
+    auth_window = tk.Tk()
+    auth_window.title(f"{role.title()} Login / Register - Code Review Bot")
+    auth_window.geometry("420x420")
+    auth_window.configure(bg="#1E1E1E")
 
-tk.Button(
-    menu_window,
-    text="Student",
-    font=("Arial", 14),
-    bg="#4CAF50",
-    fg="white",
-    padx=20,
-    pady=10,
-    command=start_student_app
-).pack(pady=20)
+    LABEL_COLOR = "#FFFFFF"
+    ENTRY_BG = "#2D2D2D"
+    ENTRY_FG = "#FFFFFF"
+    BUTTON_BG = "#007ACC"
+    BUTTON_FG = "#FFFFFF"
 
-tk.Button(
-    menu_window,
-    text="Instructor",
-    font=("Arial", 14),
-    bg="#4CAF50",
-    fg="white",
-    padx=20,
-    pady=10,
-    command=start_instructor_app
-).pack(pady=20)
+    tk.Label(auth_window, text=f"{role.title()} — Login or Register", font=("Segoe UI", 14, "bold"),
+             fg="#00FFAA", bg="#1E1E1E").pack(pady=14)
 
-tk.Button(
-    menu_window,
-    text="Exit",
-    font=("Arial", 12),
-    bg="#E53935",
-    fg="white",
-    padx=15,
-    pady=8,
-    command=menu_window.destroy
-).pack(pady=10)
+    # Username
+    tk.Label(auth_window, text="Username:", fg=LABEL_COLOR, bg="#1E1E1E").pack(anchor="w", padx=20)
+    username_entry = tk.Entry(auth_window, width=40, bg=ENTRY_BG, fg=ENTRY_FG, insertbackground="white", relief="flat")
+    username_entry.pack(padx=20, pady=6)
 
-menu_window.mainloop()
+    # Password
+    tk.Label(auth_window, text="Password:", fg=LABEL_COLOR, bg="#1E1E1E").pack(anchor="w", padx=20)
+    password_entry = tk.Entry(auth_window, width=40, show="*", bg=ENTRY_BG, fg=ENTRY_FG, insertbackground="white", relief="flat")
+    password_entry.pack(padx=20, pady=6)
+
+    # Optional: Email (if your register_user doesn't accept email, this will be ignored)
+    # Comment out if you don't want email
+    tk.Label(auth_window, text="Email (optional):", fg=LABEL_COLOR, bg="#1E1E1E").pack(anchor="w", padx=20)
+    email_entry = tk.Entry(auth_window, width=40, bg=ENTRY_BG, fg=ENTRY_FG, insertbackground="white", relief="flat")
+    email_entry.pack(padx=20, pady=6)
+
+    status_label = tk.Label(auth_window, text="", fg="#FFD700", bg="#1E1E1E")
+    status_label.pack(pady=6)
+
+    def on_login():
+        username = username_entry.get().strip()
+        password = password_entry.get().strip()
+        if not username or not password:
+            messagebox.showerror("Error", "Please enter username and password.")
+            return
+
+        user = verify_user(username, password)
+        if user:
+            # optional sanity check: ensure role matches
+            if "role" in user and user["role"] != role:
+                messagebox.showerror("Unauthorized", f"Account is a '{user['role']}' not a '{role}'.")
+                return
+
+            messagebox.showinfo("Success", f"Welcome back, {username} ({role})!")
+            auth_window.destroy()
+            if role == "student":
+                open_student_app()
+            else:
+                open_instructor_app()
+        else:
+            messagebox.showerror("Error", "Invalid username or password.")
+
+    def on_register():
+        username = username_entry.get().strip()
+        password = password_entry.get().strip()
+        email = email_entry.get().strip()  # kept if you later add email to register_user
+        if not username or not password:
+            messagebox.showerror("Error", "Please enter username and password to register.")
+            return
+
+        # call your register function (signature: register_user(username, password, role))
+        ok = False
+        try:
+            ok = register_user(username, password, role)
+        except Exception as e:
+            print("register_user error:", e)
+            ok = False
+
+        if ok:
+            messagebox.showinfo("Registered", f"Account created for {username} as {role}. You can now login.")
+            status_label.config(text="Registration successful — please login.", fg="#7CFC00")
+        else:
+            messagebox.showerror("Error", "Registration failed (username may already exist).")
+
+    def on_back():
+        # Destroy auth window and go back to the main menu
+        auth_window.destroy()
+        show_main_menu()
+
+    btn_frame = tk.Frame(auth_window, bg="#1E1E1E")
+    btn_frame.pack(pady=10)
+
+    login_btn = tk.Button(btn_frame, text="Login", width=12, command=on_login, bg="#4CAF50", fg="white", relief="flat")
+    login_btn.grid(row=0, column=0, padx=8, pady=6)
+
+    register_btn = tk.Button(btn_frame, text="Register", width=12, command=on_register, bg="#007ACC", fg="white", relief="flat")
+    register_btn.grid(row=0, column=1, padx=8, pady=6)
+
+    back_btn = tk.Button(auth_window, text="Back", command=on_back, bg="#E53935", fg="white", width=12, relief="flat")
+    back_btn.pack(pady=6)
+
+    auth_window.mainloop()
+
+
+def show_main_menu():
+    """
+    Recreate the main menu window (used when the user hits Back from the auth page).
+    This mirrors the original main menu layout.
+    """
+    global menu_window
+    menu_window = tk.Tk()
+    menu_window.title("Code Review Bot 🤖")
+    menu_window.geometry("900x650")
+    menu_window.configure(bg="#1E1E1E")
+
+    tk.Label(
+        menu_window,
+        text="Code Review Bot!",
+        font=("Arial", 20, "bold"),
+        fg="#00FFAA",
+        bg="#1E1E1E"
+    ).pack(pady=60)
+
+    tk.Label(
+        menu_window,
+        text="Are you a student or instructor?",
+        font=("Arial", 12),
+        fg="white",
+        bg="#1E1E1E"
+    ).pack(pady=10)
+
+    tk.Button(
+        menu_window,
+        text="Student",
+        font=("Arial", 14),
+        bg="#4CAF50",
+        fg="white",
+        padx=20,
+        pady=10,
+        command=lambda: open_auth_window("student")
+    ).pack(pady=20)
+
+    tk.Button(
+        menu_window,
+        text="Instructor",
+        font=("Arial", 14),
+        bg="#4CAF50",
+        fg="white",
+        padx=20,
+        pady=10,
+        command=lambda: open_auth_window("instructor")
+    ).pack(pady=20)
+
+    tk.Button(
+        menu_window,
+        text="Exit",
+        font=("Arial", 12),
+        bg="#E53935",
+        fg="white",
+        padx=15,
+        pady=8,
+        command=menu_window.destroy
+    ).pack(pady=10)
+
+    menu_window.mainloop()
+
+
+# Replace the original menu_window creation with show_main_menu() call:
+# (remove or comment out the old `menu_window = tk.Tk()` ... block and call this instead)
+if __name__ == "__main__":
+    show_main_menu()
+
 
 
