@@ -8,6 +8,8 @@ import keyword
 from github import Github, Auth
 import jwt, time, requests
 from database import register_user, verify_user
+from super_admin_app import open_super_admin_portal
+
 
 
 
@@ -177,10 +179,10 @@ def open_student_app():
     global root, code_entry, req_entry, result_text
 
     root = tk.Tk()
-    root.title("🤖 Code Review Bot")
-    root.geometry("900x650")
+    root.title("🤖 Code Review Bot - Student")
+    root.minsize(900, 650)
+    root.geometry("1100x750")  
     root.configure(bg="#1E1E1E")
-
 
     LABEL_COLOR = "#FFFFFF"
     ENTRY_BG = "#2D2D2D"
@@ -194,7 +196,18 @@ def open_student_app():
         return tk.Label(root, text=text, bg="#1E1E1E", fg=LABEL_COLOR, font=("Segoe UI", 10, "bold"))
 
     def make_button(text, command, color=BUTTON_BG):
-        return tk.Button(root, text=text, command=command, bg=color, fg=BUTTON_FG, activebackground="#0E639C", activeforeground="#FFFFFF", relief="flat", padx=8, pady=4)
+        return tk.Button(
+            root,
+            text=text,
+            command=command,
+            bg=color,
+            fg=BUTTON_FG,
+            activebackground="#0E639C",
+            activeforeground="#FFFFFF",
+            relief="flat",
+            padx=8,
+            pady=4
+        )
 
     make_label("Python Code File:").pack(anchor="w", padx=10, pady=(10, 0))
     code_entry = tk.Entry(root, width=80, bg=ENTRY_BG, fg=ENTRY_FG, insertbackground="white", relief="flat")
@@ -216,6 +229,26 @@ def open_student_app():
     )
     result_text.pack(padx=10, pady=10, expand=True, fill="both")
 
+    # 🔴 Logout button
+    def on_logout():
+        root.destroy()
+        show_main_menu()
+
+    logout_btn = tk.Button(
+        root,
+        text="Logout",
+        command=on_logout,
+        bg="#E53935",
+        fg="white",
+        padx=10,
+        pady=5,
+        relief="flat"
+    )
+    logout_btn.pack(pady=8)
+
+
+
+
 def start_instructor_app():
     menu_window.destroy()
     open_instructor_app()
@@ -226,7 +259,8 @@ def open_instructor_app():
 
     instructor_root = tk.Tk()
     instructor_root.title("👩‍🏫 Instructor Code Review")
-    instructor_root.geometry("900x800")
+    instructor_root.geometry("1200x850")   # more room for repo list + logs + buttons
+    instructor_root.minsize(1000, 750)
     instructor_root.configure(bg="#1E1E1E")
 
     LABEL_COLOR = "#FFFFFF"
@@ -241,7 +275,18 @@ def open_instructor_app():
         return tk.Label(instructor_root, text=text, bg="#1E1E1E", fg=LABEL_COLOR, font=("Segoe UI", 10, "bold"))
 
     def make_button(text, command, color=BUTTON_BG):
-        return tk.Button(instructor_root, text=text, command=command, bg=color, fg=BUTTON_FG, activebackground="#0E639C", activeforeground="#FFFFFF", relief="flat", padx=8, pady=4)
+        return tk.Button(
+            instructor_root,
+            text=text,
+            command=command,
+            bg=color,
+            fg=BUTTON_FG,
+            activebackground="#0E639C",
+            activeforeground="#FFFFFF",
+            relief="flat",
+            padx=8,
+            pady=4
+        )
 
     make_label("Requirements Text File (optional):").pack(anchor="w", padx=10, pady=(10, 0))
     req_entry = tk.Entry(instructor_root, width=70, bg=ENTRY_BG, fg=ENTRY_FG, insertbackground="white", relief="flat")
@@ -268,132 +313,56 @@ def open_instructor_app():
         log_box.config(state=tk.DISABLED)
         instructor_root.update()
 
-    def run_instructor_review():
-        org_name = org_entry.get().strip()
-        if not org_name:
-            messagebox.showerror("Error", "Please enter an organization name.")
-            return
-
-        requirements_text = None
-        req_path = req_entry.get().strip()
-        if req_path and os.path.exists(req_path):
-            with open(req_path, "r", encoding="utf-8") as f:
-                requirements_text = f.read()
-
-        try:
-            log(f"Authenticating as GitHub App (App ID: {APP_ID})...")
-
-            # Create JWT for GitHub App authentication
-            payload = {
-                "iat": int(time.time()) - 60,
-                "exp": int(time.time()) + (10 * 60),
-                "iss": APP_ID
-            }
-            app_jwt = jwt.encode(payload, PRIVATE_KEY, algorithm="RS256")
-
-            headers = {"Authorization": f"Bearer {app_jwt}", "Accept": "application/vnd.github+json"}
-            log("Fetching app installations...")
-
-            # Fetch installations for this GitHub App
-            response = requests.get("https://api.github.com/app/installations", headers=headers)
-            response.raise_for_status()
-            installations = response.json()
-
-            installation_id = None
-            for inst in installations:
-                if inst["account"]["login"].lower() == org_name.lower():
-                    installation_id = inst["id"]
-                    break
-
-            if not installation_id:
-                messagebox.showerror("Error", f"The app is not installed on the organization '{org_name}'.")
-                return
-
-            log(f"Found installation for '{org_name}' (ID: {installation_id})")
-
-            # Create installation access token
-            token_url = f"https://api.github.com/app/installations/{installation_id}/access_tokens"
-            token_response = requests.post(token_url, headers=headers)
-            token_response.raise_for_status()
-            access_token = token_response.json()["token"]
-
-            # Use token to authenticate with PyGithub
-            installation_client = Github(auth=Auth.Token(access_token))
-            org = installation_client.get_organization(org_name)
-            repos = org.get_repos()
-
-            log(f"Connected to organization '{org_name}' — found {repos.totalCount} repositories.")
-            log("Starting AI code review across all repositories...\n")
-
-            for repo in repos:
-                log(f"\nReviewing repository: {repo.name}")
-                try:
-                    process_repository(repo, requirements_text, log)
-                except Exception as e:
-                    log(f"Error in {repo.name}: {e}")
-
-            log("\nCode review completed for all repositories.")
-
-        except Exception as e:
-            messagebox.showerror("Error", f"Failed to process organization: {e}")
-
-    def process_repository(repo, requirements_text, log):
-        # Create a safe branch for reviewed code
-        base_branch = repo.default_branch
-        branch_name = "ai-code-review"
-
-        try:
-            base_ref = repo.get_git_ref(f"heads/{base_branch}")
-            repo.create_git_ref(ref=f"refs/heads/{branch_name}", sha=base_ref.object.sha)
-            log(f"Created branch '{branch_name}' from '{base_branch}'")
-        except Exception:
-            log(f"ℹBranch '{branch_name}' already exists. Continuing...")
-
-        def walk_directory(path=""):
-            contents = repo.get_contents(path)
-            for content_file in contents:
-                if content_file.type == "dir":
-                    walk_directory(content_file.path)
-                elif content_file.name.endswith(".py"):
-                    log(f"Analyzing {content_file.path}")
-                    code = content_file.decoded_content.decode("utf-8")
-                    reviewed_code = analyze_and_comment(code, requirements_text)
-
-                    if reviewed_code.strip() != code.strip():
-                        try:
-                            latest_file = repo.get_contents(content_file.path, ref=branch_name)
-                            current_sha = latest_file.sha
-
-                            repo.update_file(
-                                path=content_file.path,
-                                message=f"🤖 AI Code Review: Updated {content_file.name}",
-                                content=reviewed_code,
-                                sha=current_sha,
-                                branch=branch_name
-                            )
-                            log(f"Updated {content_file.path}")
-                        except Exception as e:
-                            if "409" in str(e):
-                                log(f"Skipped {content_file.path}: conflict (file changed upstream)")
-                            else:
-                                log(f"Error updating {content_file.path}: {e}")
-                    else:
-                        log(f"No changes needed for {content_file.path}")
-
-        walk_directory()
+    # keep your existing run_instructor_review() and process_repository() here
 
     make_button("Run Organization Review", run_instructor_review, color="#4CAF50").pack(pady=10)
 
+    # 🔴 Logout button
+    def on_logout():
+        instructor_root.destroy()
+        show_main_menu()
+
+    logout_btn = tk.Button(
+        instructor_root,
+        text="Logout",
+        command=on_logout,
+        bg="#E53935",
+        fg="white",
+        padx=10,
+        pady=5,
+        relief="flat"
+    )
+    logout_btn.pack(pady=8)
+
+    instructor_root.mainloop()
+        # --- Logout button → back to main menu ---
+    def on_logout():
+        instructor_root.destroy()   # close instructor window
+        show_main_menu()            # reopen main menu
+
+    logout_btn = tk.Button(
+        instructor_root,
+        text="Logout",
+        command=on_logout,
+        bg="#E53935",
+        fg="white",
+        padx=10,
+        pady=5,
+        relief="flat"
+    )
+    logout_btn.pack(pady=8)
+
 
 # --- AUTH UI: open_auth_window(role) and menu wiring ----------------
-
 def open_auth_window(role):
     """
     role: 'student' or 'instructor'
     This opens a window where the user can login OR register.
     On successful login/register it will open the appropriate app window.
     """
-    # Close the menu window (we only have one menu_window in global scope)
+    global menu_window
+
+    # Close the menu window if it exists
     try:
         menu_window.destroy()
     except Exception:
@@ -410,8 +379,13 @@ def open_auth_window(role):
     BUTTON_BG = "#007ACC"
     BUTTON_FG = "#FFFFFF"
 
-    tk.Label(auth_window, text=f"{role.title()} — Login or Register", font=("Segoe UI", 14, "bold"),
-             fg="#00FFAA", bg="#1E1E1E").pack(pady=14)
+    tk.Label(
+        auth_window,
+        text=f"{role.title()} — Login or Register",
+        font=("Segoe UI", 14, "bold"),
+        fg="#00FFAA",
+        bg="#1E1E1E"
+    ).pack(pady=14)
 
     # Username
     tk.Label(auth_window, text="Username:", fg=LABEL_COLOR, bg="#1E1E1E").pack(anchor="w", padx=20)
@@ -423,8 +397,7 @@ def open_auth_window(role):
     password_entry = tk.Entry(auth_window, width=40, show="*", bg=ENTRY_BG, fg=ENTRY_FG, insertbackground="white", relief="flat")
     password_entry.pack(padx=20, pady=6)
 
-    # Optional: Email (if your register_user doesn't accept email, this will be ignored)
-    # Comment out if you don't want email
+    # Email (optional)
     tk.Label(auth_window, text="Email (optional):", fg=LABEL_COLOR, bg="#1E1E1E").pack(anchor="w", padx=20)
     email_entry = tk.Entry(auth_window, width=40, bg=ENTRY_BG, fg=ENTRY_FG, insertbackground="white", relief="flat")
     email_entry.pack(padx=20, pady=6)
@@ -441,7 +414,6 @@ def open_auth_window(role):
 
         user = verify_user(username, password)
         if user:
-            # optional sanity check: ensure role matches
             if "role" in user and user["role"] != role:
                 messagebox.showerror("Unauthorized", f"Account is a '{user['role']}' not a '{role}'.")
                 return
@@ -458,13 +430,10 @@ def open_auth_window(role):
     def on_register():
         username = username_entry.get().strip()
         password = password_entry.get().strip()
-        email = email_entry.get().strip()  # kept if you later add email to register_user
         if not username or not password:
             messagebox.showerror("Error", "Please enter username and password to register.")
             return
 
-        # call your register function (signature: register_user(username, password, role))
-        ok = False
         try:
             ok = register_user(username, password, role)
         except Exception as e:
@@ -478,7 +447,6 @@ def open_auth_window(role):
             messagebox.showerror("Error", "Registration failed (username may already exist).")
 
     def on_back():
-        # Destroy auth window and go back to the main menu
         auth_window.destroy()
         show_main_menu()
 
@@ -499,8 +467,8 @@ def open_auth_window(role):
 
 def show_main_menu():
     """
-    Recreate the main menu window (used when the user hits Back from the auth page).
-    This mirrors the original main menu layout.
+    Main entry window. Safe to call after other windows are destroyed.
+    Creates a fresh Tk root each time.
     """
     global menu_window
     menu_window = tk.Tk()
@@ -546,6 +514,24 @@ def show_main_menu():
         command=lambda: open_auth_window("instructor")
     ).pack(pady=20)
 
+    # Optional: Super Admin button if you are using super_admin_app.py
+    try:
+        from super_admin_app import open_super_admin_portal
+
+        tk.Button(
+            menu_window,
+            text="Super Admin",
+            font=("Arial", 14),
+            bg="#9C27B0",
+            fg="white",
+            padx=20,
+            pady=10,
+            command=open_super_admin_portal
+        ).pack(pady=20)
+    except ImportError:
+        # If you don't have super_admin_app.py or don't want this, it's fine
+        pass
+
     tk.Button(
         menu_window,
         text="Exit",
@@ -558,6 +544,7 @@ def show_main_menu():
     ).pack(pady=10)
 
     menu_window.mainloop()
+
 
 
 # Replace the original menu_window creation with show_main_menu() call:
