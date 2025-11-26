@@ -57,20 +57,20 @@ def open_super_admin_portal():
 
     tk.Label(
         login_frame,
-        text="Super Admin Login / Register",
+        text="Super Admin Login",
         font=("Segoe UI", 14, "bold"),
         fg="#00FFAA",
         bg="#1E1E1E"
     ).pack(pady=16)
 
-    hint = (
-        "Hint: Use a special username like 'superadmin' or 'superstudent'.\n"
-        "Account is stored with role='instructor', but username starting with 'super' "
-        "is treated as a super admin."
-    )
+#    hint = (
+#        "Hint: Use a special username like 'superadmin' or 'superstudent'.\n"
+#        "Account is stored with role='instructor', but username starting with 'super' "
+#        "is treated as a super admin."
+#    )
     tk.Label(
         login_frame,
-        text=hint,
+        #text=hint,
         fg="#CCCCCC",
         bg="#1E1E1E",
         font=("Segoe UI", 9)
@@ -98,7 +98,7 @@ def open_super_admin_portal():
 
         tk.Label(
             admin_frame,
-            text=f"Super Admin – Users Overview ({super_username})",
+            text=f"Super Admin – Users Overview",
             font=("Segoe UI", 14, "bold"),
             fg="#00FFAA",
             bg="#1E1E1E"
@@ -299,16 +299,16 @@ def open_super_admin_portal():
     )
     login_btn.grid(row=0, column=0, padx=8)
 
-    register_btn = tk.Button(
-        btn_row,
-        text="Register Superadmin",
-        width=18,
-        command=on_register_superadmin,
-        bg=BUTTON_BG,
-        fg=BUTTON_FG,
-        relief="flat"
-    )
-    register_btn.grid(row=0, column=1, padx=8)
+ #   register_btn = tk.Button(
+ #       btn_row,
+ #       text="Register Superadmin",
+ #       width=18,
+ #       command=on_register_superadmin,
+ #       bg=BUTTON_BG,
+ #       fg=BUTTON_FG,
+ #       relief="flat"
+ #   )
+ #   register_btn.grid(row=0, column=1, padx=8)
 
     root.mainloop()
 
