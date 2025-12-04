@@ -1,3 +1,5 @@
+
+import requests
 import os
 from dotenv import load_dotenv
 from openai import OpenAI
@@ -6,91 +8,25 @@ from tkinter import filedialog, messagebox, scrolledtext
 import re
 import keyword
 from github import Github, Auth
-import jwt, time, requests
+import jwt, time
 from database import register_user, verify_user
 from super_admin_app import open_super_admin_portal
 
+BACKEND_URL = "https://updated-backend-ii69.onrender.com/analyze"
 
-
-
-load_dotenv()
-
-APP_ID = os.getenv("APP_ID")
-PRIVATE_KEY_PATH = os.getenv("PRIVATE_KEY_PATH")
-
-with open(PRIVATE_KEY_PATH, "r") as f:
-    PRIVATE_KEY = f.read()
-
-auth = Auth.AppAuth(app_id=APP_ID, private_key=PRIVATE_KEY)
-github_client = Github(auth=auth)
-
-
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-    
 def analyze_and_comment(code_text, requirements_text=None):
-    """
-    Analyze the code for both quality and assignment requirement completion.
-    Adds inline "# AI Review:" comments above relevant lines.
-    """
 
-    
-    lines = [l for l in code_text.splitlines() if not l.strip().startswith("# AI Review:")]
-    joined_code = "\n".join(lines)
+    payload = {
+        "code": code_text,
+        "requirements": requirements_text
+    }
 
-    if requirements_text:
-        prompt = f"""
-You are an expert teaching assistant reviewing a student's Python code for an assignment.
-Here are the assignment requirements:
+    r = requests.post(BACKEND_URL, json=payload)
 
-{requirements_text}
+    if r.status_code != 200:
+        raise Exception("Backend error: " + r.text)
 
-Review the following code. For each requirement, check if it is met or not.
-If something is missing, implemented incorrectly, or can cause a bug, insert only a comment above
-the relevant code line, starting with "# AI Review:" explaining the issue and
-how to fix it. If everything looks fine for a requirement, you don't need to comment. 
-Do not fix the code, add any code, or erase any code.
-Include any missing requirements as comments at the top of the code and analyze their progress as a percentage.
-
-Be specific, concise, and avoid redundant comments.
-Do not add "```python" at the start of the code and "```" at the end of the code.
-
-Code:
-{joined_code}
-"""
-    else:
-        prompt = f"""
-You are an expert Python reviewer.
-Review the following code for possible bugs or improvements. Insert inline comments
-starting with "# AI Review:" ABOVE the relevant lines. Avoid duplicates and noise.
-
-Code:
-{joined_code}
-"""
-
-    response = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[
-            {"role": "system", "content": "You are an expert Python code reviewer."},
-            {"role": "user", "content": prompt},
-        ],
-        temperature=0.3,
-    )
-
-    reviewed_code = response.choices[0].message.content.strip()
-
-    reviewed_lines = []
-    last_comment = None
-    for line in reviewed_code.splitlines():
-        stripped = line.strip()
-        if stripped.startswith("# AI Review:"):
-            if stripped == last_comment:
-                continue
-            last_comment = stripped
-        else:
-            last_comment = None
-        reviewed_lines.append(line)
-
-    return "\n".join(reviewed_lines)
+    return r.json()["review"]
 
 def colorize_textbox(textbox, content):
     textbox.config(state=tk.NORMAL)
@@ -297,9 +233,6 @@ def open_instructor_app():
     org_entry = tk.Entry(instructor_root, width=50, bg=ENTRY_BG, fg=ENTRY_FG, insertbackground="white", relief="flat")
     org_entry.pack(padx=10, pady=5)
 
-    repo_listbox = tk.Listbox(instructor_root, selectmode=tk.MULTIPLE, width=80, height=15, bg=TEXT_BG, fg=TEXT_FG)
-    repo_listbox.pack(padx=10, pady=10, fill="both", expand=True)
-
     log_box = scrolledtext.ScrolledText(
         instructor_root, wrap=tk.WORD, width=95, height=15,
         bg=TEXT_BG, fg=TEXT_FG, insertbackground="white", relief="flat"
@@ -313,7 +246,28 @@ def open_instructor_app():
         log_box.config(state=tk.DISABLED)
         instructor_root.update()
 
-    # keep your existing run_instructor_review() and process_repository() here
+    def run_instructor_review():
+        org_name = org_entry.get().strip()
+        if not org_name:
+            messagebox.showerror("Error", "Please enter an organization name.")
+            return
+        req_text = None
+
+        # read requirements file from desktop
+        path = req_entry.get()
+        if path and os.path.exists(path):
+            with open(path, "r") as f:
+                req_text = f.read()
+
+        data = {
+            "organization": org_name,
+            "requirements": req_text
+        }
+        log(f"Connected to organization '{org_name}'")
+        log("Starting AI code review across all repositories...\n")
+        requests.post("https://updated-backend-ii69.onrender.com/instructor_review", json=data)
+
+        log("\nCode review completed for all repositories.")
 
     make_button("Run Organization Review", run_instructor_review, color="#4CAF50").pack(pady=10)
 
@@ -335,23 +289,7 @@ def open_instructor_app():
     logout_btn.pack(pady=8)
 
     instructor_root.mainloop()
-        # --- Logout button → back to main menu ---
-    def on_logout():
-        instructor_root.destroy()   # close instructor window
-        show_main_menu()            # reopen main menu
-
-    logout_btn = tk.Button(
-        instructor_root,
-        text="Logout",
-        command=on_logout,
-        bg="#E53935",
-        fg="white",
-        padx=10,
-        pady=5,
-        relief="flat"
-    )
-    logout_btn.pack(pady=8)
-
+    
 
 # --- AUTH UI: open_auth_window(role) and menu wiring ----------------
 def open_auth_window(role):
@@ -412,7 +350,23 @@ def open_auth_window(role):
             messagebox.showerror("Error", "Please enter username and password.")
             return
 
-        user = verify_user(username, password)
+        try:
+            response = requests.post(
+                f"https://updated-backend-ii69.onrender.com/login",
+                json={"username": username, "password": password},
+                timeout=6
+            )
+            data = response.json()
+        except Exception as e:
+            messagebox.showerror("Network Error", f"Could not reach backend:\n{e}")
+            return
+
+        if not data.get("success"):
+            messagebox.showerror("Login Failed", data.get("message", "Unknown error"))
+            return
+
+        # Ensure correct user role
+        user = data["user"]
         if user:
             if "role" in user and user["role"] != role:
                 messagebox.showerror("Unauthorized", f"Account is a '{user['role']}' not a '{role}'.")
@@ -435,14 +389,20 @@ def open_auth_window(role):
             return
 
         try:
-            ok = register_user(username, password, role)
+            response = requests.post(
+                f"https://updated-backend-ii69.onrender.com/register",
+                json={"username": username, "password": password, "role": role},
+                timeout=6
+            )
+            data = response.json()
         except Exception as e:
-            print("register_user error:", e)
-            ok = False
+            messagebox.showerror("Network Error", f"Cannot reach backend:\n{e}")
+            return
 
-        if ok:
-            messagebox.showinfo("Registered", f"Account created for {username} as {role}. You can now login.")
-            status_label.config(text="Registration successful — please login.", fg="#7CFC00")
+        if data.get("success"):
+            messagebox.showinfo("Registered", "Account created. You may now log in.")
+            status_label.config(text="Registration successful — please login.",
+                                fg="#7CFC00")
         else:
             messagebox.showerror("Error", "Registration failed (username may already exist).")
 

@@ -1,40 +1,36 @@
 import tkinter as tk
 from tkinter import messagebox, scrolledtext
 from database import register_user, verify_user, get_connection
+import requests
 
 
 # ---- DB helper: fetch all non-super users ----
 def fetch_all_users():
     """
-    Returns a list of dicts: [{id, username, role}, ...]
-    Only students and instructors, sorted by role then username.
+    Calls the backend API and returns a list of users:
+    [{id, username, role}, ...]
     """
-    conn = get_connection()
     try:
-        cur = conn.cursor()
-        cur.execute(
-            """
-            SELECT id, username, role
-            FROM users
-            WHERE role IN ('student', 'instructor')
-            ORDER BY role, username
-            """
-        )
-        rows = cur.fetchall()
-        return rows
-    finally:
-        conn.close()
+        response = requests.get(f"https://updated-backend-ii69.onrender.com/admin/users")
+        data = response.json()
+
+        if not data.get("success"):
+            raise Exception(data.get("message", "Backend returned error"))
+
+        return data["users"]  # list of {id, username, role}
+
+    except Exception as e:
+        print("fetch_all_users error:", e)
+        return []
 
 
 # ---- DB helper: delete a user by id ----
 def delete_user_by_id(user_id):
-    conn = get_connection()
     try:
-        cur = conn.cursor()
-        cur.execute("DELETE FROM users WHERE id = %s", (user_id,))
-        conn.commit()
-    finally:
-        conn.close()
+        res = requests.delete(f"https://updated-backend-ii69.onrender.com/admin/users/{user_id}")
+        return res.json().get("success", False)
+    except:
+        return False
 
 
 def open_super_admin_portal():
@@ -228,11 +224,22 @@ def open_super_admin_portal():
             messagebox.showerror("Error", "Please enter username and password.")
             return
 
-        user = verify_user(username, password)
-        if not user:
-            messagebox.showerror("Error", "Invalid username or password.")
+        try:
+            response = requests.post(
+                f"https://updated-backend-ii69.onrender.com/login",
+                json={"username": username, "password": password},
+                timeout=6
+            )
+            data = response.json()
+        except Exception as e:
+            messagebox.showerror("Network Error", f"Could not reach backend:\n{e}")
             return
 
+        if not data.get("success"):
+            messagebox.showerror("Login Failed", data.get("message", "Unknown error"))
+            return
+
+        user = data["user"]
         # SUPER ADMIN RULE:
         # Any valid user whose username starts with 'super' is treated as super admin.
         if not user["username"].lower().startswith("super"):
@@ -245,45 +252,45 @@ def open_super_admin_portal():
         messagebox.showinfo("Welcome", f"Logged in as super admin: {user['username']}")
         show_admin_view(user["username"])
 
-    def on_register_superadmin():
-        username = username_entry.get().strip()
-        password = password_entry.get().strip()
-        if not username or not password:
-            messagebox.showerror("Error", "Enter username and password to register.")
-            return
+    # def on_register_superadmin():
+    #     username = username_entry.get().strip()
+    #     password = password_entry.get().strip()
+    #     if not username or not password:
+    #         messagebox.showerror("Error", "Enter username and password to register.")
+    #         return
 
-        # SUPER ADMIN REGISTRATION:
-        # We store role='instructor' so the SQL constraint is happy,
-        # but username starting with 'super' marks it as super admin in code logic.
-        if not username.lower().startswith("super"):
-            if not messagebox.askyesno(
-                "Confirm",
-                "Username does not start with 'super'.\n"
-                "It is recommended to start super admin usernames with 'super'.\n\n"
-                "Continue anyway?"
-            ):
-                return
+    #     # SUPER ADMIN REGISTRATION:
+    #     # We store role='instructor' so the SQL constraint is happy,
+    #     # but username starting with 'super' marks it as super admin in code logic.
+    #     if not username.lower().startswith("super"):
+    #         if not messagebox.askyesno(
+    #             "Confirm",
+    #             "Username does not start with 'super'.\n"
+    #             "It is recommended to start super admin usernames with 'super'.\n\n"
+    #             "Continue anyway?"
+    #         ):
+    #             return
 
-        try:
-            ok = register_user(username, password, "instructor")
-        except Exception as e:
-            print("register_user error:", e)
-            ok = False
+    #     try:
+    #         ok = register_user(username, password, "instructor")
+    #     except Exception as e:
+    #         print("register_user error:", e)
+    #         ok = False
 
-        if ok:
-            status_label.config(
-                text="Super admin registered (stored as role='instructor'). You can now login.",
-                fg="#7CFC00"
-            )
-            messagebox.showinfo(
-                "Registered",
-                f"Super admin account created for '{username}'."
-            )
-        else:
-            messagebox.showerror(
-                "Error",
-                "Registration failed (username may already exist)."
-            )
+    #     if ok:
+    #         status_label.config(
+    #             text="Super admin registered (stored as role='instructor'). You can now login.",
+    #             fg="#7CFC00"
+    #         )
+    #         messagebox.showinfo(
+    #             "Registered",
+    #             f"Super admin account created for '{username}'."
+    #         )
+    #     else:
+    #         messagebox.showerror(
+    #             "Error",
+    #             "Registration failed (username may already exist)."
+    #         )
 
     btn_row = tk.Frame(login_frame, bg="#1E1E1E")
     btn_row.pack(pady=12)
